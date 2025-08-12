@@ -7,6 +7,7 @@ import com.gspann.meetingroombooking.dto.MeetingRoomResponse;
 import com.gspann.meetingroombooking.entity.Booking;
 import com.gspann.meetingroombooking.entity.MeetingRoom;
 import com.gspann.meetingroombooking.entity.User;
+import com.gspann.meetingroombooking.exception.BookingConflictException;
 import com.gspann.meetingroombooking.repository.BookingRepository;
 import com.gspann.meetingroombooking.repository.MeetingRoomRepository;
 import com.gspann.meetingroombooking.repository.UserRepository;
@@ -50,7 +51,10 @@ public class BookingServiceImpl implements BookingService {
         );
 
         if (!overlapping.isEmpty()) {
-            throw new RuntimeException("Meeting room is already booked for the selected time slot.");
+            throw new BookingConflictException(
+                    "This meeting room is already booked between " +
+                            request.getStartTime() + " and " + request.getEndTime()
+            );
         }
 
         Booking booking=Booking.builder()
