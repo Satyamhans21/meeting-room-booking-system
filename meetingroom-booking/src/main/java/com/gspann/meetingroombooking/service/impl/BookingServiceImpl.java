@@ -14,11 +14,13 @@ import com.gspann.meetingroombooking.repository.UserRepository;
 import com.gspann.meetingroombooking.service.BookingService;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import org.apache.coyote.BadRequestException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import org.springframework.security.access.AccessDeniedException;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -42,6 +44,8 @@ public class BookingServiceImpl implements BookingService {
         MeetingRoom room=meetingRoomRepository.findById(request.getRoomId()).orElseThrow(()->new RuntimeException("Meeting Room not found"));
         User user = userRepository.findById(userIdFromToken)
                 .orElseThrow(() -> new RuntimeException("User not found"));
+
+        validateBooking(request.getStartTime(),request.getEndTime());
 
         // 🔴 Check for overlapping bookings
         List<Booking> overlapping = bookingRepository.findOverlappingBookings(
@@ -81,6 +85,7 @@ public class BookingServiceImpl implements BookingService {
 
     @Override
     public List<MeetingRoomResponse> getAvailableRooms(LocalDateTime startTime, LocalDateTime endTime) {
+        validateBooking(startTime,endTime);
         List<Long> bookedRoomIds=bookingRepository.findBookedRoomIdsBetween(startTime,endTime);
         List<MeetingRoom> rooms;
         if(bookedRoomIds.isEmpty()){
@@ -110,6 +115,21 @@ public class BookingServiceImpl implements BookingService {
         bookingRepository.delete(booking);
 
     }
+    public void validateBooking(LocalDateTime startTime,LocalDateTime endTime){
+        if(startTime.isBefore(LocalDateTime.now())){
+            throw new RuntimeException("Start time cannot be in past");
+        }
+        if(!endTime.isAfter(startTime)){
+            throw new RuntimeException("End time cannot be before start time");
+        }
+        if(!startTime.toLocalDate().equals(endTime.toLocalDate())){
+            throw new RuntimeException("booking must start and end on same day");
+        }
+        long durationMinutes= Duration.between(startTime,endTime).toMinutes();
+        if(durationMinutes>480){
+            throw new RuntimeException("booking cannot exceed 8 hours");
+        }
+    }
 
     private BookingDetailsResponse mapToDetailsResponse(Booking booking) {
         return BookingDetailsResponse.builder()
@@ -123,4 +143,6 @@ public class BookingServiceImpl implements BookingService {
                 .purpose(booking.getPurpose())
                 .build();
     }
+
+
 }
